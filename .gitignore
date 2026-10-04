@@ -8,8 +8,9 @@ cdk.context.json
 .env.*
 !.env.example
 
-# 作業用の一時ファイル
-tmp/
+# 作業用の一時ファイル（ディレクトリ自体は .gitkeep で残す）
+tmp/*
+!tmp/.gitkeep
 
 # ツールの作業ファイル
 .playwright-mcp/
