@@ -23,6 +23,7 @@ function newApp() {
     submitSummaryJob: new SubmitSummaryJob(repository, noopDispatcher),
     getSummaryJob: new GetSummaryJob(repository),
     listSummaryJobs: new ListSummaryJobs(repository),
+    auth: { mode: 'disabled', user: { id: 'local', name: 'local' } },
   });
   const post = (body: unknown) =>
     app.request('/api/jobs', {

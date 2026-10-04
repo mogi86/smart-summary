@@ -4,7 +4,8 @@
   "type": "module",
   "workspaces": [
     "app",
-    "web"
+    "web",
+    "infra"
   ],
   "scripts": {
     "cli": "npm run cli -w app --",
@@ -16,7 +17,10 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "dev": "concurrently -n api,web -c blue,green \"npm run dev -w app\" \"npm run dev -w web\"",
-    "build": "npm run build -w web"
+    "build": "npm run build -w web",
+    "synth": "npm run build -w web && npm run synth -w infra",
+    "diff": "npm run build -w web && npm run diff -w infra",
+    "deploy": "npm run build -w web && npm run deploy -w infra"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

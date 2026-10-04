@@ -7,8 +7,8 @@
 
 ## 現状
 
-- 実装済み: 抽出→要約のパイプライン、CLI、HTTP API、React 画面（いずれも local で動作）
-- 未実装: Slack 認証、AWS へのデプロイ（`infra/` の CDK）
+- 実装済み: 抽出→要約のパイプライン、CLI、HTTP API、React 画面、Slack 認証、CDK（`infra/`）
+- 未確認: AWS への実際のデプロイと、本物の Slack でのログイン（`cdk synth` とテストまで確認済み）
 
 ## コマンド
 
@@ -21,6 +21,9 @@ npm test
 npm run typecheck
 npm run lint
 npm run format
+npm run synth       # 画面をビルドして cdk synth
+npm run diff        # 画面をビルドして cdk diff（デプロイ前に差分を確認する）
+npm run deploy      # 画面をビルドして cdk deploy（実行前にユーザーへ確認すること）
 ```
 
 DynamoDB リポジトリの結合テストは `DYNAMODB_ENDPOINT=http://localhost:8000 npm test` のときだけ実行される。
@@ -35,7 +38,7 @@ npm workspaces。
 ```
 app/     バックエンド（オニオンアーキテクチャ）
 web/     画面（React + Vite + Tailwind CSS）
-infra/   AWS CDK（未作成。アプリケーションコードとは分ける）
+infra/   AWS CDK（アプリケーションコードとは分ける）
 docs/    Slack App 作成手順
 tmp/     作業用（.gitkeep 以外は git 管理対象外）
 ```
@@ -47,13 +50,12 @@ tmp/     作業用（.gitkeep 以外は git 管理対象外）
 | `domain/`         | `SummaryJob`（状態遷移）、生成物の型、リポジトリのインターフェース   |
 | `application/`    | ユースケース、ポート（`Extractor` / `Summarizer` / `JobDispatcher`） |
 | `infrastructure/` | DynamoDB、Gemini、ジョブ起動、設定                                   |
-| `presentation/`   | CLI、HTTP API（Hono）、依存の組み立て（`localComposition.ts`）       |
+| `presentation/`   | CLI、HTTP API（Hono）、Lambda ハンドラ、依存の組み立て               |
 
 - 依存は外側から内側への一方向のみ（presentation / infrastructure → application → domain）。
   ESLint の `no-restricted-imports` で強制している
 - 外部サービスへの依存は application のポートか domain のリポジトリ IF 越しに使う
-- 依存の組み立ては presentation で行う。local 用は `localComposition.ts`。
-  Lambda 用を追加するときは別の組み立てを用意する
+- 依存の組み立ては presentation で行う。local 用は `localComposition.ts`、Lambda 用は `lambda/composition.ts`
 
 ### 処理の流れ
 
@@ -62,7 +64,7 @@ tmp/     作業用（.gitkeep 以外は git 管理対象外）
 3. 状態は `pending → extracting → summarizing → completed`（失敗時は `failed`）
 
 `JobDispatcher` は実行環境で差し替える。CLI は完了まで待ち、local の API サーバはバックグラウンドで実行する。
-AWS では Worker Lambda の非同期呼び出しにする想定。
+AWS では Web Lambda が Worker Lambda を非同期で呼び出す。
 
 ### DynamoDB
 
@@ -98,11 +100,14 @@ AWS では Worker Lambda の非同期呼び出しにする想定。
 - **既定モデルは `gemini-3.5-flash-lite`**。料金を優先して選んでいる。Gemini 2.5 系は新規プロジェクト
   からの利用が制限されているため使わない
 
-### 認証（未実装・方針）
+### 認証
 
 - Sign in with Slack（OpenID Connect）。ID トークンの `https://slack.com/team_id` が
   許可する team ID と一致する場合だけログインを許可する。照合は名前ではなく team ID で行う
-- Slack の Redirect URL は HTTPS 必須のため、local の画面は認証を通さない
+- Slack の Redirect URL は HTTPS 必須のため、local の画面は認証を通さない。認証の有無は環境変数ではなく
+  依存の組み立てで決まる（`localServer.ts` だけが無効にする）。Lambda 側に認証を外す経路を作らないこと
+- `/api` 配下はすべてログイン必須。未ログインで返すのは画面の静的ファイルと `/auth` だけ
+- シークレットは Lambda の環境変数に入れず、起動時に SSM（`/smart-summary/` 配下）から読む
 
 ### ドキュメント
 

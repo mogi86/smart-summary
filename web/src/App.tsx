@@ -1,13 +1,48 @@
 import { useCallback, useEffect, useState } from 'react';
-import { isFinished, type Job, listJobs } from './api';
+import { getMe, isFinished, type Job, listJobs, logout, type Me, UNAUTHORIZED_EVENT } from './api';
 import { JobDetail } from './components/JobDetail';
 import { JobList } from './components/JobList';
+import { Login } from './components/Login';
 import { NewJobForm } from './components/NewJobForm';
 import { useInterval, useSelectedJobId } from './hooks';
 
 const LIST_POLL_INTERVAL_MS = 3000;
 
+/** ログイン状態を確認し、ログイン済みの場合だけ本体の画面を表示する */
 export function App() {
+  // undefined: 確認中 / null: 未ログイン
+  const [me, setMe] = useState<Me | null | undefined>(undefined);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    getMe()
+      .then(setMe)
+      .catch((caught: unknown) =>
+        setError(caught instanceof Error ? caught.message : String(caught)),
+      );
+
+    const onUnauthorized = () => setMe(null);
+    window.addEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
+    return () => window.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
+  }, []);
+
+  if (error) {
+    return (
+      <p role="alert" className="m-6 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">
+        {error}
+      </p>
+    );
+  }
+  if (me === undefined) {
+    return null;
+  }
+  if (me === null) {
+    return <Login />;
+  }
+  return <Workspace me={me} onLogout={() => void logout().then(() => setMe(null))} />;
+}
+
+function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
   const [selectedJobId, selectJob] = useSelectedJobId();
   const [jobs, setJobs] = useState<Job[] | null>(null);
   const [listError, setListError] = useState<string | null>(null);
@@ -39,7 +74,18 @@ export function App() {
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
           <h1 className="text-base font-semibold tracking-tight">smart-summary</h1>
-          <span className="text-xs text-slate-500">長文を抽出 → 要約の 2 段階で要約</span>
+          <div className="flex items-center gap-3 text-xs text-slate-500">
+            <span>{me.user.name}</span>
+            {me.authEnabled && (
+              <button
+                type="button"
+                onClick={onLogout}
+                className="rounded-md border border-slate-300 px-2 py-1 font-medium text-slate-600 transition-colors hover:bg-slate-100"
+              >
+                ログアウト
+              </button>
+            )}
+          </div>
         </div>
       </header>
 

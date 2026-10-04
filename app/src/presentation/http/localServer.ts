@@ -8,6 +8,8 @@ const app = createApp({
   submitSummaryJob: createSubmitSummaryJob(),
   getSummaryJob,
   listSummaryJobs,
+  // Slack の Redirect URL は HTTPS 必須のため、local では認証を行わない
+  auth: { mode: 'disabled', user: { id: 'local', name: 'local' } },
 });
 
 const port = Number(process.env.PORT) || 3000;

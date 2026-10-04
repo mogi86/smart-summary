@@ -16,6 +16,31 @@ export interface JobDetail {
   summary: { text: string; createdAt: string } | null;
 }
 
+export interface Me {
+  user: { id: string; name: string };
+  /** false の場合は認証なしで動いている（local） */
+  authEnabled: boolean;
+}
+
+/** セッションが無効になったときに発火するイベント名 */
+export const UNAUTHORIZED_EVENT = 'smart-summary:unauthorized';
+
+/** ログイン中の利用者を返す。未ログインの場合は null */
+export async function getMe(): Promise<Me | null> {
+  const response = await fetch('/api/me');
+  if (response.status === 401) {
+    return null;
+  }
+  if (!response.ok) {
+    throw new Error(`利用者情報の取得に失敗しました (${response.status})`);
+  }
+  return (await response.json()) as Me;
+}
+
+export async function logout(): Promise<void> {
+  await fetch('/auth/logout', { method: 'POST' });
+}
+
 export function isFinished(status: JobStatus): boolean {
   return status === 'completed' || status === 'failed';
 }
@@ -39,6 +64,9 @@ export function submitJob(input: { title?: string; text: string }): Promise<Job>
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, init);
+  if (response.status === 401) {
+    window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+  }
   if (!response.ok) {
     const body = (await response.json().catch(() => null)) as { message?: string } | null;
     throw new Error(body?.message ?? `リクエストに失敗しました (${response.status})`);

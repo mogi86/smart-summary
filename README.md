@@ -3,7 +3,7 @@
 長文を「抽出 → 要約」の 2 段階で要約するツールです。抽出と要約は LLM（Gemini）で行い、
 入力・抽出結果・要約を DynamoDB に保存します。
 
-現在は local で、画面と CLI から使えます。Slack 認証と AWS へのデプロイは未実装です。
+local では画面と CLI から使えます。AWS では Lambda の Function URL で画面を公開し、Slack でログインします。
 
 ## 必要なもの
 
@@ -53,6 +53,70 @@ npm run cli -- show <jobId>                         # 抽出した要点と要�
 
 `tmp/` は git 管理対象外の作業用ディレクトリです。要約したいファイルの置き場所に使えます。
 
+## AWS へのデプロイ
+
+構成は Lambda（Web / Worker）+ Function URL + DynamoDB で、`infra/` の CDK で管理します。リージョンは ap-northeast-1 です。
+
+### 1. シークレットを登録する
+
+実値は SSM Parameter Store にだけ置きます。Slack の値の取得方法は [docs/slack-app-setup.md](docs/slack-app-setup.md) を参照してください。
+
+まず、値をシェル変数に入れます。書き換えるのはこのブロックの `'...'` の中だけです。
+
+```sh
+GEMINI_API_KEY='...'          # Gemini API キー
+SLACK_CLIENT_ID='...'         # Slack App の Client ID
+SLACK_CLIENT_SECRET='...'     # Slack App の Client Secret
+SLACK_ALLOWED_TEAM_ID='...'   # ログインを許可するワークスペースの team ID
+```
+
+次に、同じターミナルで以下をそのまま実行します（書き換え不要）。
+
+```sh
+aws ssm put-parameter --region ap-northeast-1 --type SecureString --overwrite --name /smart-summary/gemini-api-key        --value "$GEMINI_API_KEY"
+aws ssm put-parameter --region ap-northeast-1 --type SecureString --overwrite --name /smart-summary/slack/client-id       --value "$SLACK_CLIENT_ID"
+aws ssm put-parameter --region ap-northeast-1 --type SecureString --overwrite --name /smart-summary/slack/client-secret   --value "$SLACK_CLIENT_SECRET"
+aws ssm put-parameter --region ap-northeast-1 --type SecureString --overwrite --name /smart-summary/slack/allowed-team-id --value "$SLACK_ALLOWED_TEAM_ID"
+aws ssm put-parameter --region ap-northeast-1 --type SecureString --overwrite --name /smart-summary/session-secret        --value "$(openssl rand -base64 32)"
+```
+
+- 最後の `session-secret` はセッションの署名鍵で、ランダムな値をその場で生成して登録します
+- 値を変更するときは、該当する行だけをもう一度実行します
+- パラメータ名は `app/src/presentation/lambda/composition.ts` の `PARAMETERS` と対応しています
+
+### 2. デプロイする
+
+そのアカウント・リージョンで初めて CDK を使う場合のみ、先に bootstrap を実行します。
+
+```sh
+npx -w infra cdk bootstrap
+```
+
+デプロイ前に、AWS 上の現状との差分を確認します。
+
+```sh
+npm run diff
+```
+
+追加・変更・削除されるリソースと、IAM 権限の変更が表示されます。意図しない変更（特にテーブルの置き換えや削除）が
+含まれていないことを確認してから、デプロイします。
+
+```sh
+npm run deploy
+```
+
+出力される `Url` が画面の URL です。
+
+### 3. Slack App に Redirect URL を登録する
+
+`<Url>/auth/slack/callback` を Slack App の Redirect URLs に登録します（[手順](docs/slack-app-setup.md)）。
+
+### 認証
+
+- ログインは Sign in with Slack で行い、`allowed-team-id` のワークスペース以外からのログインは拒否します
+- 拒否した場合は、Web の Lambda のログに拒否したワークスペースの team ID が出ます
+- Slack の Redirect URL は HTTPS 必須のため、local（`npm run dev`）では認証を行いません
+
 ## 処理の流れ
 
 1. 入力テキストを保存する
@@ -70,8 +134,9 @@ app/src/
 ├── domain/           # エンティティ、リポジトリのインターフェース
 ├── application/      # ユースケース、LLM・ジョブ起動のポート
 ├── infrastructure/   # DynamoDB、Gemini、設定
-└── presentation/     # CLI、HTTP API
+└── presentation/     # CLI、HTTP API、Lambda ハンドラ
 web/src/              # 画面（React）
+infra/                # AWS CDK
 docs/                 # Slack App 作成手順
 tmp/                  # 作業用（git 管理対象外）
 ```
@@ -81,6 +146,7 @@ tmp/                  # 作業用（git 管理対象外）
 ```sh
 npm test            # ユニットテスト
 npm run build       # 画面のビルド
+npm run synth       # CloudFormation テンプレートの生成（デプロイはしない）
 npm run typecheck
 npm run lint
 npm run format

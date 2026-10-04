@@ -11,3 +11,10 @@ export class InvalidInputError extends Error {
     this.name = 'InvalidInputError';
   }
 }
+
+export class WorkspaceNotAllowedError extends Error {
+  constructor(readonly teamId: string) {
+    super(`許可されていないワークスペースです: ${teamId}`);
+    this.name = 'WorkspaceNotAllowedError';
+  }
+}
