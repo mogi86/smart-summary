@@ -9,14 +9,16 @@ const USAGE = `使い方:
   npm run cli -- jobs                                 ジョブ一覧を表示する
   npm run cli -- show <jobId>                         抽出した要点と要約を表示する`;
 
-async function main(): Promise<void> {
+async function main({
+  getSummaryJob,
+  listSummaryJobs,
+  createSubmitSummaryJob,
+}: ReturnType<typeof composeLocal>): Promise<void> {
   const { positionals, values } = parseArgs({
     allowPositionals: true,
     options: { title: { type: 'string' } },
   });
   const [command, target] = positionals;
-
-  const { getSummaryJob, listSummaryJobs, createSubmitSummaryJob } = composeLocal('wait');
 
   switch (command) {
     case 'summarize': {
@@ -82,12 +84,16 @@ function printDetail(
   }
 }
 
+const local = composeLocal('wait');
 try {
-  await main();
+  await main(local);
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);
   if (error instanceof Error && error.name === 'ResourceNotFoundException') {
     console.error('DynamoDB のテーブルが見つかりません。npm run db:init を実行してください');
   }
   process.exitCode = 1;
+} finally {
+  // すぐ終了するプロセスのため、未送信のトレースを送ってから終わる
+  await local.tracing.shutdown();
 }

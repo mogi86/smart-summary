@@ -44,6 +44,11 @@ export class SmartSummaryStack extends Stack {
       timeout: Duration.minutes(5),
       // ジョブの失敗は状態として記録するため、Lambda 側では再試行しない
       retryAttempts: 0,
+      // Langfuse の接続先と環境名。キーは SSM から読む
+      environment: {
+        LANGFUSE_BASE_URL: 'https://jp.cloud.langfuse.com',
+        LANGFUSE_TRACING_ENVIRONMENT: 'aws',
+      },
     });
 
     // API と画面を返す

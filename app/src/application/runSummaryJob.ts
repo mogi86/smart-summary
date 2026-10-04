@@ -2,6 +2,7 @@ import type { Extraction } from '../domain/documents';
 import type { SummaryJob } from '../domain/summaryJob';
 import type { SummaryJobRepository } from '../domain/summaryJobRepository';
 import { JobNotFoundError } from './errors';
+import { noopJobTracer, type JobTracer } from './ports/jobTracer';
 import type { Extractor, Summarizer } from './ports/llm';
 
 /** ジョブを実行する（入力からの要点抽出 → 要点からの要約） */
@@ -10,6 +11,7 @@ export class RunSummaryJob {
     private readonly repository: SummaryJobRepository,
     private readonly extractor: Extractor,
     private readonly summarizer: Summarizer,
+    private readonly tracer: JobTracer = noopJobTracer,
     private readonly now: () => Date = () => new Date(),
   ) {}
 
@@ -20,6 +22,11 @@ export class RunSummaryJob {
       throw new JobNotFoundError(jobId);
     }
 
+    return this.tracer.trace(found, () => this.run(found));
+  }
+
+  private async run(found: SummaryJob): Promise<SummaryJob> {
+    const jobId = found.id;
     let job = found.startExtracting(this.now());
     await this.repository.save(job);
 

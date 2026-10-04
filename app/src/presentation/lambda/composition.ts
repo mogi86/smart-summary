@@ -7,6 +7,11 @@ import { LambdaJobDispatcher } from '../../infrastructure/dispatcher/lambdaJobDi
 import { createDocumentClient } from '../../infrastructure/dynamodb/client';
 import { DynamoSummaryJobRepository } from '../../infrastructure/dynamodb/dynamoSummaryJobRepository';
 import { GeminiLlm } from '../../infrastructure/gemini/geminiLlm';
+import {
+  LangfuseJobTracer,
+  startLangfuseTracing,
+  type LangfuseTracing,
+} from '../../infrastructure/langfuse/langfuseTracing';
 import { SlackIdentityProvider } from '../../infrastructure/slack/slackIdentityProvider';
 import { loadParameters } from '../../infrastructure/ssm/parameterStore';
 import type { AppDependencies } from '../http/app';
@@ -15,6 +20,8 @@ import { SessionTokens } from '../http/session';
 /** シークレットを置く SSM パラメータ名。値は README の手順で登録する */
 const PARAMETERS = {
   geminiApiKey: '/smart-summary/gemini-api-key',
+  langfusePublicKey: '/smart-summary/langfuse/public-key',
+  langfuseSecretKey: '/smart-summary/langfuse/secret-key',
   slackClientId: '/smart-summary/slack/client-id',
   slackClientSecret: '/smart-summary/slack/client-secret',
   slackAllowedTeamId: '/smart-summary/slack/allowed-team-id',
@@ -61,8 +68,22 @@ export async function composeWeb(staticRoot: string): Promise<AppDependencies> {
 }
 
 /** Worker Lambda 用の依存の組み立て */
-export async function composeWorker(): Promise<RunSummaryJob> {
-  const secrets = await loadParameters([PARAMETERS.geminiApiKey]);
+export async function composeWorker(): Promise<{
+  runSummaryJob: RunSummaryJob;
+  tracing: LangfuseTracing;
+}> {
+  const secrets = await loadParameters([
+    PARAMETERS.geminiApiKey,
+    PARAMETERS.langfusePublicKey,
+    PARAMETERS.langfuseSecretKey,
+  ]);
+  const tracing = startLangfuseTracing({
+    publicKey: secrets[PARAMETERS.langfusePublicKey],
+    secretKey: secrets[PARAMETERS.langfuseSecretKey],
+  });
   const llm = new GeminiLlm(secrets[PARAMETERS.geminiApiKey], loadConfig().geminiModel);
-  return new RunSummaryJob(createRepository(), llm, llm);
+  return {
+    runSummaryJob: new RunSummaryJob(createRepository(), llm, llm, new LangfuseJobTracer()),
+    tracing,
+  };
 }

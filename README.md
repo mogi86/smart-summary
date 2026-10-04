@@ -10,12 +10,13 @@ local では画面と CLI から使えます。AWS では Lambda の Function UR
 - Node.js 24 以上
 - Docker（DynamoDB Local 用）
 - Gemini API キー
+- Langfuse Cloud のアカウント（LLM 呼び出しのトレースの送信先）
 
 ## セットアップ
 
 ```sh
 npm install
-cp .env.example .env   # GEMINI_API_KEY を設定する
+cp .env.example .env   # GEMINI_API_KEY と Langfuse のキーを設定する
 npm run db:up          # DynamoDB Local を起動する
 npm run db:init        # テーブルを作成する（初回のみ）
 ```
@@ -24,13 +25,26 @@ DynamoDB Local の中身は、ブラウザで http://localhost:8001 を開くと
 
 `.env` の設定項目:
 
-| 変数                | 説明                                                      |
-| ------------------- | --------------------------------------------------------- |
-| `GEMINI_API_KEY`    | Gemini API キー                                           |
-| `GEMINI_MODEL`      | 使用するモデル。未設定の場合は `gemini-3.5-flash-lite`    |
-| `DYNAMODB_ENDPOINT` | DynamoDB Local の接続先。省略時は `http://localhost:8000` |
+| 変数                           | 説明                                                                |
+| ------------------------------ | ------------------------------------------------------------------- |
+| `GEMINI_API_KEY`               | Gemini API キー                                                     |
+| `GEMINI_MODEL`                 | 使用するモデル。未設定の場合は `gemini-3.5-flash-lite`              |
+| `LANGFUSE_PUBLIC_KEY`          | Langfuse のプロジェクトの Public Key                                |
+| `LANGFUSE_SECRET_KEY`          | Langfuse のプロジェクトの Secret Key                                |
+| `LANGFUSE_BASE_URL`            | Langfuse の接続先。日本リージョンは `https://jp.cloud.langfuse.com` |
+| `LANGFUSE_TRACING_ENVIRONMENT` | Langfuse 上の環境名。local では `local`                             |
+| `DYNAMODB_ENDPOINT`            | DynamoDB Local の接続先。省略時は `http://localhost:8000`           |
 
 `.env` は git 管理対象外です。API キーなどの実値をコミットしないでください。
+
+### Langfuse
+
+LLM の呼び出し（入力・出力・トークン使用量）を [Langfuse Cloud](https://jp.cloud.langfuse.com) に送ります。
+1 ジョブが 1 件のトレースになり、その中に抽出（`extract`）と要約（`summarize`）が記録されます。
+
+- キーは Langfuse のプロジェクトの設定画面（Settings → API Keys）で発行します
+- local と AWS は同じプロジェクト・同じキーを使い、環境名（`local` / `aws`）で区別します。
+  Langfuse の画面では、上部の環境フィルタで切り替えます
 
 ## 使い方
 
@@ -65,6 +79,8 @@ npm run cli -- show <jobId>                         # 抽出した要点と要�
 
 ```sh
 GEMINI_API_KEY='...'          # Gemini API キー
+LANGFUSE_PUBLIC_KEY='...'     # Langfuse の Public Key
+LANGFUSE_SECRET_KEY='...'     # Langfuse の Secret Key
 SLACK_CLIENT_ID='...'         # Slack App の Client ID
 SLACK_CLIENT_SECRET='...'     # Slack App の Client Secret
 SLACK_ALLOWED_TEAM_ID='...'   # ログインを許可するワークスペースの team ID
@@ -74,6 +90,8 @@ SLACK_ALLOWED_TEAM_ID='...'   # ログインを許可するワークスペース
 
 ```sh
 aws ssm put-parameter --region ap-northeast-1 --type SecureString --overwrite --name /smart-summary/gemini-api-key        --value "$GEMINI_API_KEY"
+aws ssm put-parameter --region ap-northeast-1 --type SecureString --overwrite --name /smart-summary/langfuse/public-key   --value "$LANGFUSE_PUBLIC_KEY"
+aws ssm put-parameter --region ap-northeast-1 --type SecureString --overwrite --name /smart-summary/langfuse/secret-key   --value "$LANGFUSE_SECRET_KEY"
 aws ssm put-parameter --region ap-northeast-1 --type SecureString --overwrite --name /smart-summary/slack/client-id       --value "$SLACK_CLIENT_ID"
 aws ssm put-parameter --region ap-northeast-1 --type SecureString --overwrite --name /smart-summary/slack/client-secret   --value "$SLACK_CLIENT_SECRET"
 aws ssm put-parameter --region ap-northeast-1 --type SecureString --overwrite --name /smart-summary/slack/allowed-team-id --value "$SLACK_ALLOWED_TEAM_ID"
@@ -132,8 +150,8 @@ npm run deploy
 ```
 app/src/
 ├── domain/           # エンティティ、リポジトリのインターフェース
-├── application/      # ユースケース、LLM・ジョブ起動のポート
-├── infrastructure/   # DynamoDB、Gemini、設定
+├── application/      # ユースケース、LLM・ジョブ起動・トレースのポート
+├── infrastructure/   # DynamoDB、Gemini、Langfuse、設定
 └── presentation/     # CLI、HTTP API、Lambda ハンドラ
 web/src/              # 画面（React）
 infra/                # AWS CDK

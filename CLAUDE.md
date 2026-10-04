@@ -1,7 +1,8 @@
 # smart-summary
 
 長文を「抽出 → 要約」の 2 段階で要約するツール。抽出と要約は LLM（Gemini）で行い、
-入力・抽出した要点・要約を DynamoDB に保存する。個人利用のツールで、リリースはしない。
+入力・抽出した要点・要約を DynamoDB に保存する。LLM の呼び出しは Langfuse Cloud にトレースとして送る。
+個人利用のツールで、リリースはしない。
 
 セットアップと使い方は `README.md` を参照。
 
@@ -45,12 +46,12 @@ tmp/     作業用（.gitkeep 以外は git 管理対象外）
 
 ### app/src のレイヤ
 
-| レイヤ            | 役割                                                                 |
-| ----------------- | -------------------------------------------------------------------- |
-| `domain/`         | `SummaryJob`（状態遷移）、生成物の型、リポジトリのインターフェース   |
-| `application/`    | ユースケース、ポート（`Extractor` / `Summarizer` / `JobDispatcher`） |
-| `infrastructure/` | DynamoDB、Gemini、ジョブ起動、設定                                   |
-| `presentation/`   | CLI、HTTP API（Hono）、Lambda ハンドラ、依存の組み立て               |
+| レイヤ            | 役割                                                                               |
+| ----------------- | ---------------------------------------------------------------------------------- |
+| `domain/`         | `SummaryJob`（状態遷移）、生成物の型、リポジトリのインターフェース                 |
+| `application/`    | ユースケース、ポート（`Extractor` / `Summarizer` / `JobDispatcher` / `JobTracer`） |
+| `infrastructure/` | DynamoDB、Gemini、Langfuse、ジョブ起動、設定                                       |
+| `presentation/`   | CLI、HTTP API（Hono）、Lambda ハンドラ、依存の組み立て                             |
 
 - 依存は外側から内側への一方向のみ（presentation / infrastructure → application → domain）。
   ESLint の `no-restricted-imports` で強制している
@@ -80,7 +81,7 @@ AWS では Web Lambda が Worker Lambda を非同期で呼び出す。
 
 このリポジトリは GitHub で public。次の値は git 管理下のファイルに書かない。
 
-- API キー、Slack の Client ID / Secret、セッション署名鍵
+- API キー（Gemini、Langfuse）、Slack の Client ID / Secret、セッション署名鍵
 - 許可する Slack ワークスペースの名前と team ID
 - AWS アカウント ID、Function URL などの実 URL
 
@@ -108,6 +109,17 @@ AWS では Web Lambda が Worker Lambda を非同期で呼び出す。
   依存の組み立てで決まる（`localServer.ts` だけが無効にする）。Lambda 側に認証を外す経路を作らないこと
 - `/api` 配下はすべてログイン必須。未ログインで返すのは画面の静的ファイルと `/auth` だけ
 - シークレットは Lambda の環境変数に入れず、起動時に SSM（`/smart-summary/` 配下）から読む
+
+### Langfuse
+
+- Langfuse Cloud（日本リージョン、Hobby プラン）を使う。プロジェクトと API キーは 1 つで、
+  local と AWS は環境名（`LANGFUSE_TRACING_ENVIRONMENT` の `local` / `aws`）で区別する
+- 1 ジョブを 1 トレース（`LangfuseJobTracer`）とし、抽出と要約を generation として `GeminiLlm` で記録する
+- SDK はバッファして非同期に送るため、すぐ終わるプロセスでは送り切ってから終える。
+  CLI は終了前に `tracing.shutdown()`、Worker Lambda はハンドラが返る前に `tracing.flush()` を呼ぶ
+- OpenTelemetry のリソース自動検出は無効にしている（`autoDetectResources: false`）。
+  有効にするとホスト名・OS ユーザー名・コマンドライン引数がトレースに付いて送られる
+- Langfuse の画面の AI 機能（Bedrock へのデータ送信）は使わない。Organization の設定でオフにしておく
 
 ### ドキュメント
 

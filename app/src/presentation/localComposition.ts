@@ -9,6 +9,10 @@ import {
 import { createDocumentClient, LOCAL_DYNAMODB_ENDPOINT } from '../infrastructure/dynamodb/client';
 import { DynamoSummaryJobRepository } from '../infrastructure/dynamodb/dynamoSummaryJobRepository';
 import { GeminiLlm } from '../infrastructure/gemini/geminiLlm';
+import {
+  LangfuseJobTracer,
+  startLangfuseTracing,
+} from '../infrastructure/langfuse/langfuseTracing';
 
 /**
  * local 実行（CLI・API サーバ）用の依存の組み立て。
@@ -21,13 +25,17 @@ export function composeLocal(dispatch: 'wait' | 'background') {
     createDocumentClient(config.dynamoEndpoint ?? LOCAL_DYNAMODB_ENDPOINT),
   );
 
+  // Langfuse のキーと接続先は環境変数（.env）から読まれる
+  const tracing = startLangfuseTracing();
+
   return {
+    tracing,
     getSummaryJob: new GetSummaryJob(repository),
     listSummaryJobs: new ListSummaryJobs(repository),
     /** Gemini API キーが必要になるため、使うときに組み立てる */
     createSubmitSummaryJob(): SubmitSummaryJob {
       const llm = new GeminiLlm(loadGeminiApiKey(), config.geminiModel);
-      const runSummaryJob = new RunSummaryJob(repository, llm, llm);
+      const runSummaryJob = new RunSummaryJob(repository, llm, llm, new LangfuseJobTracer());
       const dispatcher =
         dispatch === 'wait'
           ? new InProcessJobDispatcher(runSummaryJob)

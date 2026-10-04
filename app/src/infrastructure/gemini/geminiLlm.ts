@@ -1,4 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
+import { startObservation } from '@langfuse/tracing';
 import type { Extractor, Summarizer } from '../../application/ports/llm';
 
 const EXTRACTION_INSTRUCTION = `あなたは長文から要点を抽出するアシスタントです。
@@ -39,28 +40,87 @@ export class GeminiLlm implements Extractor, Summarizer {
   }
 
   async extract(text: string): Promise<string[]> {
-    const interaction = await this.client.interactions.create({
-      model: this.model,
-      system_instruction: EXTRACTION_INSTRUCTION,
-      input: text,
-      response_format: {
-        type: 'text',
-        mime_type: 'application/json',
-        schema: EXTRACTION_SCHEMA,
-      },
-    });
-    return parseKeyPoints(requireOutput(interaction.output_text));
+    const outputText = await this.generate('extract', EXTRACTION_INSTRUCTION, text, () =>
+      this.client.interactions.create({
+        model: this.model,
+        system_instruction: EXTRACTION_INSTRUCTION,
+        input: text,
+        response_format: {
+          type: 'text',
+          mime_type: 'application/json',
+          schema: EXTRACTION_SCHEMA,
+        },
+      }),
+    );
+    return parseKeyPoints(outputText);
   }
 
   async summarize(title: string, keyPoints: string[]): Promise<string> {
     const keyPointList = keyPoints.map((keyPoint) => `- ${keyPoint}`).join('\n');
-    const interaction = await this.client.interactions.create({
-      model: this.model,
-      system_instruction: SUMMARY_INSTRUCTION,
-      input: `タイトル: ${title}\n\n要点一覧:\n${keyPointList}`,
-    });
-    return requireOutput(interaction.output_text).trim();
+    const input = `タイトル: ${title}\n\n要点一覧:\n${keyPointList}`;
+    const outputText = await this.generate('summarize', SUMMARY_INSTRUCTION, input, () =>
+      this.client.interactions.create({
+        model: this.model,
+        system_instruction: SUMMARY_INSTRUCTION,
+        input,
+      }),
+    );
+    return outputText.trim();
   }
+
+  /** LLM を呼び出し、入出力とトークン使用量を Langfuse の generation として記録する */
+  private async generate(
+    name: string,
+    instruction: string,
+    input: string,
+    call: () => Promise<InteractionResult>,
+  ): Promise<string> {
+    const generation = startObservation(
+      name,
+      {
+        model: this.model,
+        input: [
+          { role: 'system', content: instruction },
+          { role: 'user', content: input },
+        ],
+      },
+      { asType: 'generation' },
+    );
+    try {
+      const interaction = await call();
+      const outputText = requireOutput(interaction.output_text);
+      generation.update({
+        output: outputText,
+        usageDetails: toUsageDetails(interaction.usage),
+      });
+      return outputText;
+    } catch (error) {
+      generation.update({
+        level: 'ERROR',
+        statusMessage: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    } finally {
+      generation.end();
+    }
+  }
+}
+
+interface InteractionResult {
+  output_text?: string;
+  usage?: {
+    total_input_tokens?: number;
+    total_output_tokens?: number;
+    total_tokens?: number;
+  };
+}
+
+function toUsageDetails(usage: InteractionResult['usage']): Record<string, number> {
+  const details: Record<string, number> = {};
+  if (usage?.total_input_tokens !== undefined) details.input = usage.total_input_tokens;
+  if (usage?.total_output_tokens !== undefined) details.output = usage.total_output_tokens;
+  if (usage?.total_tokens !== undefined) details.total = usage.total_tokens;
+  return details;
 }
 
 function requireOutput(outputText: string | undefined): string {
