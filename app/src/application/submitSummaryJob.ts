@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { SummaryJob } from '../domain/summaryJob';
 import type { SummaryJobRepository } from '../domain/summaryJobRepository';
-import { splitIntoChunks } from '../domain/textChunker';
 import { InvalidInputError } from './errors';
 import type { JobDispatcher } from './ports/jobDispatcher';
 
@@ -23,20 +22,19 @@ export class SubmitSummaryJob {
   ) {}
 
   async execute(input: SubmitSummaryJobInput): Promise<SummaryJob> {
-    const chunks = splitIntoChunks(input.text);
-    if (chunks.length === 0) {
+    const text = input.text.trim();
+    if (text === '') {
       throw new InvalidInputError('入力テキストが空です');
     }
 
     const job = SummaryJob.create({
       id: this.generateId(),
-      title: resolveTitle(input.title, chunks[0].text),
-      chunkCount: chunks.length,
+      title: resolveTitle(input.title, text),
       createdBy: input.createdBy,
       now: this.now(),
     });
 
-    await this.repository.saveSourceChunks(job.id, chunks);
+    await this.repository.saveSourceText(job.id, text);
     await this.repository.save(job);
     await this.dispatcher.dispatch(job.id);
     return job;
@@ -44,7 +42,7 @@ export class SubmitSummaryJob {
 }
 
 /** タイトル未指定の場合は本文の 1 行目を使う */
-function resolveTitle(title: string | undefined, firstChunkText: string): string {
-  const candidate = title?.trim() || firstChunkText.split('\n')[0].trim();
+function resolveTitle(title: string | undefined, text: string): string {
+  const candidate = title?.trim() || text.split('\n')[0].trim();
   return candidate.slice(0, MAX_TITLE_LENGTH);
 }

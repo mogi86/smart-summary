@@ -35,16 +35,16 @@ npm run db:init        # テーブルを作成する（初回のみ）
 ```sh
 npm run cli -- summarize <file> [--title <title>]   # ファイルを要約する
 npm run cli -- jobs                                 # ジョブ一覧を表示する
-npm run cli -- show <jobId>                         # チャンクごとの抽出結果と要約を表示する
+npm run cli -- show <jobId>                         # 抽出した要点と要約を表示する
 ```
 
 `tmp/` は git 管理対象外の作業用ディレクトリです。要約したいファイルの置き場所に使えます。
 
 ## 処理の流れ
 
-1. 入力テキストを段落の境界で最大 8000 文字のチャンクに分割して保存する
-2. チャンクごとに LLM で要点を抽出して保存する
-3. 全チャンクの要点から LLM で要約を生成して保存する
+1. 入力テキストを保存する
+2. 入力テキスト全文から LLM で要点を抽出して保存する
+3. 抽出した要点から LLM で要約を生成して保存する
 
 ジョブの状態は `pending → extracting → summarizing → completed`（失敗時は `failed`）と遷移します。
 
@@ -54,7 +54,7 @@ npm run cli -- show <jobId>                         # チャンクごとの抽�
 
 ```
 app/src/
-├── domain/           # エンティティ、リポジトリのインターフェース、チャンク分割
+├── domain/           # エンティティ、リポジトリのインターフェース
 ├── application/      # ユースケース、LLM・ジョブ起動のポート
 ├── infrastructure/   # DynamoDB、Gemini、設定
 └── presentation/     # CLI

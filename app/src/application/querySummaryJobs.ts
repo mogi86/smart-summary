@@ -5,7 +5,7 @@ import { JobNotFoundError } from './errors';
 
 export interface SummaryJobDetail {
   job: SummaryJob;
-  extractions: Extraction[];
+  extraction: Extraction | null;
   summary: Summary | null;
 }
 
@@ -18,11 +18,11 @@ export class GetSummaryJob {
     if (!job) {
       throw new JobNotFoundError(jobId);
     }
-    const [extractions, summary] = await Promise.all([
-      this.repository.findExtractions(jobId),
+    const [extraction, summary] = await Promise.all([
+      this.repository.findExtraction(jobId),
       this.repository.findSummary(jobId),
     ]);
-    return { job, extractions, summary };
+    return { job, extraction, summary };
   }
 }
 

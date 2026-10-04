@@ -20,7 +20,7 @@ import { GeminiLlm } from '../../infrastructure/gemini/geminiLlm';
 const USAGE = `使い方:
   npm run cli -- summarize <file> [--title <title>]   ファイルを要約する
   npm run cli -- jobs                                 ジョブ一覧を表示する
-  npm run cli -- show <jobId>                         抽出結果と要約を表示する`;
+  npm run cli -- show <jobId>                         抽出した要点と要約を表示する`;
 
 async function main(): Promise<void> {
   const { positionals, values } = parseArgs({
@@ -82,23 +82,20 @@ async function main(): Promise<void> {
 }
 
 function printDetail(
-  { job, extractions, summary }: SummaryJobDetail,
-  withExtractions: boolean,
+  { job, extraction, summary }: SummaryJobDetail,
+  withExtraction: boolean,
 ): void {
   console.log(`ジョブID : ${job.id}`);
   console.log(`タイトル : ${job.title}`);
   console.log(`状態     : ${job.status}`);
-  console.log(`チャンク : ${extractions.length} / ${job.chunkCount} 抽出済み`);
   if (job.errorMessage) {
     console.log(`エラー   : ${job.errorMessage}`);
   }
 
-  if (withExtractions) {
-    for (const extraction of extractions) {
-      console.log(`\n--- 抽出結果 (チャンク ${extraction.chunkIndex + 1}) ---`);
-      for (const keyPoint of extraction.keyPoints) {
-        console.log(`- ${keyPoint}`);
-      }
+  if (withExtraction && extraction) {
+    console.log('\n--- 抽出した要点 ---');
+    for (const keyPoint of extraction.keyPoints) {
+      console.log(`- ${keyPoint}`);
     }
   }
 

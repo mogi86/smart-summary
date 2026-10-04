@@ -13,8 +13,6 @@ export interface SummaryJobProps {
   id: string;
   title: string;
   status: JobStatus;
-  /** 入力を分割したチャンク数 */
-  chunkCount: number;
   createdBy: string;
   createdAt: string;
   updatedAt: string;
@@ -25,22 +23,12 @@ export interface SummaryJobProps {
 export class SummaryJob {
   private constructor(private readonly props: SummaryJobProps) {}
 
-  static create(params: {
-    id: string;
-    title: string;
-    chunkCount: number;
-    createdBy: string;
-    now: Date;
-  }): SummaryJob {
-    if (params.chunkCount < 1) {
-      throw new DomainError('入力テキストが空です');
-    }
+  static create(params: { id: string; title: string; createdBy: string; now: Date }): SummaryJob {
     const timestamp = params.now.toISOString();
     return new SummaryJob({
       id: params.id,
       title: params.title,
       status: 'pending',
-      chunkCount: params.chunkCount,
       createdBy: params.createdBy,
       createdAt: timestamp,
       updatedAt: timestamp,
@@ -60,9 +48,6 @@ export class SummaryJob {
   }
   get status(): JobStatus {
     return this.props.status;
-  }
-  get chunkCount(): number {
-    return this.props.chunkCount;
   }
   get createdBy(): string {
     return this.props.createdBy;

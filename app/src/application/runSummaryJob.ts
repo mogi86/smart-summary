@@ -1,12 +1,10 @@
+import type { Extraction } from '../domain/documents';
 import type { SummaryJob } from '../domain/summaryJob';
 import type { SummaryJobRepository } from '../domain/summaryJobRepository';
 import { JobNotFoundError } from './errors';
 import type { Extractor, Summarizer } from './ports/llm';
 
-/** 抽出を同時に実行するチャンク数 */
-const EXTRACTION_CONCURRENCY = 3;
-
-/** ジョブを実行する（チャンクごとの抽出 → 抽出結果からの要約） */
+/** ジョブを実行する（入力からの要点抽出 → 要点からの要約） */
 export class RunSummaryJob {
   constructor(
     private readonly repository: SummaryJobRepository,
@@ -26,13 +24,12 @@ export class RunSummaryJob {
     await this.repository.save(job);
 
     try {
-      await this.extractAll(jobId);
+      const extraction = await this.extract(jobId);
 
       job = job.startSummarizing(this.now());
       await this.repository.save(job);
 
-      const extractions = await this.repository.findExtractions(jobId);
-      const text = await this.summarizer.summarize(job.title, extractions);
+      const text = await this.summarizer.summarize(job.title, extraction.keyPoints);
       await this.repository.saveSummary(jobId, { text, createdAt: this.now().toISOString() });
 
       job = job.complete(this.now());
@@ -44,21 +41,22 @@ export class RunSummaryJob {
     return job;
   }
 
-  /** 抽出済みのチャンクは飛ばすため、失敗したジョブの再実行では途中から再開される */
-  private async extractAll(jobId: string): Promise<void> {
-    const chunks = await this.repository.findSourceChunks(jobId);
-    const extracted = await this.repository.findExtractions(jobId);
-    const done = new Set(extracted.map((extraction) => extraction.chunkIndex));
-    const pending = chunks.filter((chunk) => !done.has(chunk.index));
-
-    for (let start = 0; start < pending.length; start += EXTRACTION_CONCURRENCY) {
-      const batch = pending.slice(start, start + EXTRACTION_CONCURRENCY);
-      await Promise.all(
-        batch.map(async (chunk) => {
-          const keyPoints = await this.extractor.extract(chunk);
-          await this.repository.saveExtraction(jobId, { chunkIndex: chunk.index, keyPoints });
-        }),
-      );
+  /** 抽出済みの場合は再利用するため、失敗したジョブの再実行では要約から再開される */
+  private async extract(jobId: string): Promise<Extraction> {
+    const existing = await this.repository.findExtraction(jobId);
+    if (existing) {
+      return existing;
     }
+
+    const sourceText = await this.repository.findSourceText(jobId);
+    if (sourceText === null) {
+      throw new Error('入力テキストが保存されていません');
+    }
+    const extraction: Extraction = {
+      keyPoints: await this.extractor.extract(sourceText),
+      createdAt: this.now().toISOString(),
+    };
+    await this.repository.saveExtraction(jobId, extraction);
+    return extraction;
   }
 }

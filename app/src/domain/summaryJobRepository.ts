@@ -1,4 +1,4 @@
-import type { Extraction, SourceChunk, Summary } from './documents';
+import type { Extraction, Summary } from './documents';
 import type { SummaryJob } from './summaryJob';
 
 /** ジョブと、それに紐づく input・中間生成物・最終生成物の永続化 */
@@ -8,11 +8,11 @@ export interface SummaryJobRepository {
   /** 作成日時の新しい順に返す */
   list(limit: number): Promise<SummaryJob[]>;
 
-  saveSourceChunks(jobId: string, chunks: SourceChunk[]): Promise<void>;
-  findSourceChunks(jobId: string): Promise<SourceChunk[]>;
+  saveSourceText(jobId: string, text: string): Promise<void>;
+  findSourceText(jobId: string): Promise<string | null>;
 
   saveExtraction(jobId: string, extraction: Extraction): Promise<void>;
-  findExtractions(jobId: string): Promise<Extraction[]>;
+  findExtraction(jobId: string): Promise<Extraction | null>;
 
   saveSummary(jobId: string, summary: Summary): Promise<void>;
   findSummary(jobId: string): Promise<Summary | null>;

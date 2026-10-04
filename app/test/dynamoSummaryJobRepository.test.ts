@@ -15,30 +15,28 @@ describe.skipIf(!endpoint)('DynamoSummaryJobRepository', () => {
     const job = SummaryJob.create({
       id: jobId,
       title: 'テスト',
-      chunkCount: 12,
       createdBy: 'test',
       now: new Date(),
     });
-    const chunks = Array.from({ length: 12 }, (_, index) => ({ index, text: `chunk-${index}` }));
+    const extraction = { keyPoints: ['a', 'b'], createdAt: job.createdAt };
+    const summary = { text: '要約', createdAt: job.createdAt };
 
-    await repository.saveSourceChunks(jobId, chunks);
+    await repository.saveSourceText(jobId, '入力テキスト');
     await repository.save(job);
-    await repository.saveExtraction(jobId, { chunkIndex: 1, keyPoints: ['b'] });
-    await repository.saveExtraction(jobId, { chunkIndex: 0, keyPoints: ['a'] });
-    await repository.saveSummary(jobId, { text: '要約', createdAt: job.createdAt });
+    await repository.saveExtraction(jobId, extraction);
+    await repository.saveSummary(jobId, summary);
 
     expect((await repository.findById(jobId))?.toProps()).toEqual(job.toProps());
-    expect(await repository.findSourceChunks(jobId)).toEqual(chunks);
-    expect(await repository.findExtractions(jobId)).toEqual([
-      { chunkIndex: 0, keyPoints: ['a'] },
-      { chunkIndex: 1, keyPoints: ['b'] },
-    ]);
-    expect(await repository.findSummary(jobId)).toEqual({ text: '要約', createdAt: job.createdAt });
+    expect(await repository.findSourceText(jobId)).toBe('入力テキスト');
+    expect(await repository.findExtraction(jobId)).toEqual(extraction);
+    expect(await repository.findSummary(jobId)).toEqual(summary);
     expect((await repository.list(5)).map((listed) => listed.id)).toContain(jobId);
   });
 
   it('存在しないジョブは null を返す', async () => {
     expect(await repository.findById(randomUUID())).toBeNull();
+    expect(await repository.findSourceText(randomUUID())).toBeNull();
+    expect(await repository.findExtraction(randomUUID())).toBeNull();
     expect(await repository.findSummary(randomUUID())).toBeNull();
   });
 });
