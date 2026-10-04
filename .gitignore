@@ -8,6 +8,9 @@ cdk.context.json
 .env.*
 !.env.example
 
+# 作業用の一時ファイル
+tmp/
+
 # ツールの作業ファイル
 .playwright-mcp/
 .DS_Store

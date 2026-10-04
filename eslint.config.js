@@ -16,7 +16,7 @@ const restrictImports = (...layers) => ({
 });
 
 export default tseslint.config(
-  { ignores: ['**/node_modules/', '**/dist/', '**/cdk.out/', '.playwright-mcp/'] },
+  { ignores: ['**/node_modules/', '**/dist/', '**/cdk.out/', '.playwright-mcp/', 'tmp/'] },
   js.configs.recommended,
   tseslint.configs.recommended,
   {
