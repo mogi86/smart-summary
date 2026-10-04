@@ -1,21 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { basename, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import {
-  GetSummaryJob,
-  ListSummaryJobs,
-  type SummaryJobDetail,
-} from '../../application/querySummaryJobs';
-import { RunSummaryJob } from '../../application/runSummaryJob';
-import { SubmitSummaryJob } from '../../application/submitSummaryJob';
-import { loadConfig, loadGeminiApiKey } from '../../infrastructure/config';
-import { InProcessJobDispatcher } from '../../infrastructure/dispatcher/inProcessJobDispatcher';
-import {
-  createDocumentClient,
-  LOCAL_DYNAMODB_ENDPOINT,
-} from '../../infrastructure/dynamodb/client';
-import { DynamoSummaryJobRepository } from '../../infrastructure/dynamodb/dynamoSummaryJobRepository';
-import { GeminiLlm } from '../../infrastructure/gemini/geminiLlm';
+import type { SummaryJobDetail } from '../../application/querySummaryJobs';
+import { composeLocal } from '../localComposition';
 
 const USAGE = `使い方:
   npm run cli -- summarize <file> [--title <title>]   ファイルを要約する
@@ -29,12 +16,7 @@ async function main(): Promise<void> {
   });
   const [command, target] = positionals;
 
-  const config = loadConfig();
-  // CLI は local 専用のため、接続先が未設定でも実 AWS には接続しない
-  const repository = new DynamoSummaryJobRepository(
-    createDocumentClient(config.dynamoEndpoint ?? LOCAL_DYNAMODB_ENDPOINT),
-  );
-  const getSummaryJob = new GetSummaryJob(repository);
+  const { getSummaryJob, listSummaryJobs, createSubmitSummaryJob } = composeLocal('wait');
 
   switch (command) {
     case 'summarize': {
@@ -43,12 +25,7 @@ async function main(): Promise<void> {
       const filePath = resolve(process.env.INIT_CWD ?? process.cwd(), target);
       const text = await readFile(filePath, 'utf8');
 
-      const llm = new GeminiLlm(loadGeminiApiKey(), config.geminiModel);
-      const runSummaryJob = new RunSummaryJob(repository, llm, llm);
-      const submitSummaryJob = new SubmitSummaryJob(
-        repository,
-        new InProcessJobDispatcher(runSummaryJob),
-      );
+      const submitSummaryJob = createSubmitSummaryJob();
 
       console.log('抽出→要約を実行しています...');
       const submitted = await submitSummaryJob.execute({
@@ -64,7 +41,7 @@ async function main(): Promise<void> {
       return;
     }
     case 'jobs': {
-      const jobs = await new ListSummaryJobs(repository).execute();
+      const jobs = await listSummaryJobs.execute();
       for (const job of jobs) {
         console.log(`${job.id}  ${job.status.padEnd(11)}  ${job.createdAt}  ${job.title}`);
       }

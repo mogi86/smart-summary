@@ -3,7 +3,7 @@
 長文を「抽出 → 要約」の 2 段階で要約するツールです。抽出と要約は LLM（Gemini）で行い、
 入力・抽出結果・要約を DynamoDB に保存します。
 
-現在は local の CLI で動作します。画面、Slack 認証、AWS へのデプロイは未実装です。
+現在は local で、画面と CLI から使えます。Slack 認証と AWS へのデプロイは未実装です。
 
 ## 必要なもの
 
@@ -34,6 +34,17 @@ DynamoDB Local の中身は、ブラウザで http://localhost:8001 を開くと
 
 ## 使い方
 
+### 画面
+
+```sh
+npm run dev
+```
+
+http://localhost:5173 を開きます。文章を貼り付けるかテキストファイルを読み込んで「要約する」を押すと、
+抽出した要点と要約が表示されます。API サーバは http://localhost:3000 で起動し、画面からは `/api` 経由で呼び出します。
+
+### CLI
+
 ```sh
 npm run cli -- summarize <file> [--title <title>]   # ファイルを要約する
 npm run cli -- jobs                                 # ジョブ一覧を表示する
@@ -59,7 +70,8 @@ app/src/
 ├── domain/           # エンティティ、リポジトリのインターフェース
 ├── application/      # ユースケース、LLM・ジョブ起動のポート
 ├── infrastructure/   # DynamoDB、Gemini、設定
-└── presentation/     # CLI
+└── presentation/     # CLI、HTTP API
+web/src/              # 画面（React）
 docs/                 # Slack App 作成手順
 tmp/                  # 作業用（git 管理対象外）
 ```
@@ -68,6 +80,7 @@ tmp/                  # 作業用（git 管理対象外）
 
 ```sh
 npm test            # ユニットテスト
+npm run build       # 画面のビルド
 npm run typecheck
 npm run lint
 npm run format

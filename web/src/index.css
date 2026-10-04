@@ -1,0 +1,40 @@
+@import 'tailwindcss';
+
+/* 要約（Markdown）の表示用 */
+.markdown {
+  line-height: 1.8;
+}
+.markdown > * + * {
+  margin-top: 0.9em;
+}
+.markdown h1,
+.markdown h2,
+.markdown h3,
+.markdown h4 {
+  margin-top: 1.5em;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.markdown h1,
+.markdown h2 {
+  font-size: 1.125rem;
+}
+.markdown > :first-child {
+  margin-top: 0;
+}
+.markdown ul,
+.markdown ol {
+  padding-left: 1.4em;
+}
+.markdown ul {
+  list-style: disc;
+}
+.markdown ol {
+  list-style: decimal;
+}
+.markdown li + li {
+  margin-top: 0.3em;
+}
+.markdown strong {
+  font-weight: 600;
+}
