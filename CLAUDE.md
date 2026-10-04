@@ -6,11 +6,6 @@
 
 セットアップと使い方は `README.md` を参照。
 
-## 現状
-
-- 実装済み: 抽出→要約のパイプライン、CLI、HTTP API、React 画面、Slack 認証、CDK（`infra/`）
-- 未確認: AWS への実際のデプロイと、本物の Slack でのログイン（`cdk synth` とテストまで確認済み）
-
 ## コマンド
 
 ```sh
@@ -55,7 +50,10 @@ tmp/     作業用（.gitkeep 以外は git 管理対象外）
 
 - 依存は外側から内側への一方向のみ（presentation / infrastructure → application → domain）。
   ESLint の `no-restricted-imports` で強制している
-- 外部サービスへの依存は application のポートか domain のリポジトリ IF 越しに使う
+- インターフェースは、それを使うレイヤに定義する。実装は外側のレイヤ（infrastructure）に置く
+  - ユースケースが使う外部機能（LLM、ジョブ起動、認証、トレース）は `application/ports/`
+  - ドメインのモデルの保存・取得（`SummaryJobRepository`）は `domain/`
+- `application/ports/` は独立したレイヤではなく、application レイヤの一部
 - 依存の組み立ては presentation で行う。local 用は `localComposition.ts`、Lambda 用は `lambda/composition.ts`
 
 ### 処理の流れ
