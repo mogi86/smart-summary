@@ -22,11 +22,11 @@ npm run db:init        # テーブルを作成する（初回のみ）
 
 `.env` の設定項目:
 
-| 変数                | 説明                                                        |
-| ------------------- | ----------------------------------------------------------- |
-| `GEMINI_API_KEY`    | Gemini API キー                                             |
-| `GEMINI_MODEL`      | 使用するモデル。未設定の場合は `gemini-3.5-flash-lite`      |
-| `DYNAMODB_ENDPOINT` | DynamoDB Local の接続先。local 専用で、AWS 上では設定しない |
+| 変数                | 説明                                                      |
+| ------------------- | --------------------------------------------------------- |
+| `GEMINI_API_KEY`    | Gemini API キー                                           |
+| `GEMINI_MODEL`      | 使用するモデル。未設定の場合は `gemini-3.5-flash-lite`    |
+| `DYNAMODB_ENDPOINT` | DynamoDB Local の接続先。省略時は `http://localhost:8000` |
 
 `.env` は git 管理対象外です。API キーなどの実値をコミットしないでください。
 

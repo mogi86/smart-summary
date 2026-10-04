@@ -1,5 +1,5 @@
 import { CreateTableCommand, ResourceInUseException } from '@aws-sdk/client-dynamodb';
-import { createDynamoClient } from './client';
+import { createDynamoClient, LOCAL_DYNAMODB_ENDPOINT } from './client';
 import { JOB_LIST_INDEX, TABLE_NAME } from './dynamoSummaryJobRepository';
 
 /**
@@ -7,10 +7,8 @@ import { JOB_LIST_INDEX, TABLE_NAME } from './dynamoSummaryJobRepository';
  * AWS 上のテーブルは infra/ の CDK で定義するため、キー構成を変える場合は両方を揃えること。
  */
 async function main(): Promise<void> {
-  const endpoint = process.env.DYNAMODB_ENDPOINT;
-  if (!endpoint) {
-    throw new Error('DYNAMODB_ENDPOINT が未設定です。local 以外では実行しないでください');
-  }
+  // 接続先が未設定でも実 AWS にはテーブルを作らない
+  const endpoint = process.env.DYNAMODB_ENDPOINT || LOCAL_DYNAMODB_ENDPOINT;
 
   try {
     await createDynamoClient(endpoint).send(

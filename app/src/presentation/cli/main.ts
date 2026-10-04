@@ -10,7 +10,10 @@ import { RunSummaryJob } from '../../application/runSummaryJob';
 import { SubmitSummaryJob } from '../../application/submitSummaryJob';
 import { loadConfig, loadGeminiApiKey } from '../../infrastructure/config';
 import { InProcessJobDispatcher } from '../../infrastructure/dispatcher/inProcessJobDispatcher';
-import { createDocumentClient } from '../../infrastructure/dynamodb/client';
+import {
+  createDocumentClient,
+  LOCAL_DYNAMODB_ENDPOINT,
+} from '../../infrastructure/dynamodb/client';
 import { DynamoSummaryJobRepository } from '../../infrastructure/dynamodb/dynamoSummaryJobRepository';
 import { GeminiLlm } from '../../infrastructure/gemini/geminiLlm';
 
@@ -27,7 +30,10 @@ async function main(): Promise<void> {
   const [command, target] = positionals;
 
   const config = loadConfig();
-  const repository = new DynamoSummaryJobRepository(createDocumentClient(config.dynamoEndpoint));
+  // CLI は local 専用のため、接続先が未設定でも実 AWS には接続しない
+  const repository = new DynamoSummaryJobRepository(
+    createDocumentClient(config.dynamoEndpoint ?? LOCAL_DYNAMODB_ENDPOINT),
+  );
   const getSummaryJob = new GetSummaryJob(repository);
 
   switch (command) {
@@ -106,5 +112,8 @@ try {
   await main();
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);
+  if (error instanceof Error && error.name === 'ResourceNotFoundException') {
+    console.error('DynamoDB のテーブルが見つかりません。npm run db:init を実行してください');
+  }
   process.exitCode = 1;
 }
