@@ -1,0 +1,25 @@
+{
+  "name": "smart-summary",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "app"
+  ],
+  "scripts": {
+    "cli": "npm run cli -w app --",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "db:init": "npm run db:init -w app",
+    "test": "npm test -w app",
+    "typecheck": "npm run typecheck -w app",
+    "lint": "eslint .",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.12.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.9.9",
+    "typescript-eslint": "^8.71.0"
+  }
+}

@@ -1,0 +1,21 @@
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
+
+/** endpoint を指定した場合は DynamoDB Local に接続する */
+export function createDynamoClient(endpoint?: string): DynamoDBClient {
+  if (!endpoint) {
+    return new DynamoDBClient({});
+  }
+  return new DynamoDBClient({
+    endpoint,
+    region: 'local',
+    // DynamoDB Local は認証情報を検証しないためダミー値を渡す
+    credentials: { accessKeyId: 'local', secretAccessKey: 'local' },
+  });
+}
+
+export function createDocumentClient(endpoint?: string): DynamoDBDocumentClient {
+  return DynamoDBDocumentClient.from(createDynamoClient(endpoint), {
+    marshallOptions: { removeUndefinedValues: true },
+  });
+}

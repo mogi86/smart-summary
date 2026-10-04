@@ -1,0 +1,13 @@
+node_modules/
+dist/
+cdk.out/
+cdk.context.json
+
+# シークレット・環境固有の値
+.env
+.env.*
+!.env.example
+
+# ツールの作業ファイル
+.playwright-mcp/
+.DS_Store
