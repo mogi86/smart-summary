@@ -8,5 +8,18 @@ services:
     volumes:
       - dynamodb-data:/data
 
+  # DynamoDB Local の中身をブラウザで見るための管理画面（http://localhost:8001）
+  dynamodb-admin:
+    image: aaronshaf/dynamodb-admin:latest
+    environment:
+      DYNAMO_ENDPOINT: http://dynamodb:8000
+      AWS_REGION: local
+      AWS_ACCESS_KEY_ID: local
+      AWS_SECRET_ACCESS_KEY: local
+    ports:
+      - '127.0.0.1:8001:8001'
+    depends_on:
+      - dynamodb
+
 volumes:
   dynamodb-data:

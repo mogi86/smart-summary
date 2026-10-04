@@ -20,6 +20,8 @@ npm run db:up          # DynamoDB Local を起動する
 npm run db:init        # テーブルを作成する（初回のみ）
 ```
 
+DynamoDB Local の中身は、ブラウザで http://localhost:8001 を開くと確認できます（dynamodb-admin）。
+
 `.env` の設定項目:
 
 | 変数                | 説明                                                      |
